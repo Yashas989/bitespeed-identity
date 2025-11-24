@@ -1,4 +1,4 @@
-package com.bitespeed.identity;
+package com.bitespeed.identity.identity;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
