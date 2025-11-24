@@ -1,60 +1,73 @@
-Bitespeed Identity Reconciliation – Backend Service
+# Bitespeed Identity Reconciliation – Backend Service
 
-This repository contains a production-ready Spring Boot implementation of the Identity Reconciliation problem from Bitespeed.
-It exposes a single endpoint /identify that merges customer contact records based on shared email or phone number, and returns a unified identity profile.
+This repository contains a production-ready Spring Boot implementation of the **Identity Reconciliation** problem from Bitespeed. It exposes a single endpoint `/identify` that merges customer contact records based on shared email or phone number, and returns a unified identity profile.
 
-🚀 Live API Endpoint
+---
 
-The service is deployed on Render and available here:
+## 🚀 Live API Endpoint
 
-📌 POST
-https://bitespeed-identity-mwhm.onrender.com/identify
+The service is deployed on **Render** and available here:
 
-📌 Problem Summary
+**POST**
+`https://bitespeed-identity-mwhm.onrender.com/identify`
+
+---
+
+## 📌 Problem Summary
 
 A user may provide:
 
-email
+* `email`
+* `phoneNumber`
+* or both
 
-phoneNumber
+But multiple customer entries may represent the *same person* across time. Your system must:
 
-or both
+### ✔ Identify all related contacts (via email or phone)
 
-But multiple customer entries may represent the same person across time.
-Your system must:
+### ✔ Decide which one is the **primary** record
 
-✔ Identify all related contacts (via email or phone)
-✔ Decide which one is the primary record
-✔ Convert the rest to secondary
-✔ Maintain proper linked relationships
-✔ Return a merged identity profile
+### ✔ Convert the rest to **secondary**
+
+### ✔ Maintain proper linked relationships
+
+### ✔ Return a merged identity profile
 
 This service ensures consistent identity resolution across scattered customer data.
 
-🏗 Tech Stack
+---
 
-Java 17
+## 🏗 Tech Stack
 
-Spring Boot 3
+* **Java 17+ / Java 23 tested**
+* **Spring Boot 3**
+* **Spring Data JPA + Hibernate**
+* **PostgreSQL** (production on Render)
+* **Docker (for deployment on Render)**
+* **Maven**
 
-Spring Data JPA + Hibernate
+---
 
-PostgreSQL
+## 📡 API Specification
 
-Render (Docker Deployment)
+### **POST /identify**
 
-📡 API Specification
-POST /identify
-Request Body
+#### Request Body
+
+```json
 {
   "email": "test@example.com",
   "phoneNumber": "1234567890"
 }
-
+```
 
 Both fields are optional — at least one must be present.
 
-📤 Sample Response
+---
+
+## 📤 Sample Response
+
+```json
 {
   "contact": {
     "primaryContactId": 2,
@@ -63,55 +76,78 @@ Both fields are optional — at least one must be present.
     "secondaryContactIds": [3]
   }
 }
+```
 
-Response Fields:
-Field	Description
-primaryContactId	The canonical "main" contact
-emails	All emails linked to the identity
-phoneNumbers	All phone numbers linked to the identity
-secondaryContactIds	IDs of merged secondary contacts
-🧠 How Identity Resolution Works
+### Response Fields:
 
-The service checks if the provided email or phone number already exists.
+| Field                 | Description                              |
+| --------------------- | ---------------------------------------- |
+| `primaryContactId`    | The canonical "main" contact             |
+| `emails`              | All emails linked to the identity        |
+| `phoneNumbers`        | All phone numbers linked to the identity |
+| `secondaryContactIds` | IDs of merged secondary contacts         |
 
-If no match exists → a new primary contact is created.
+---
 
-If matches exist:
+## 🧠 How Identity Resolution Works
 
-Find the earliest primary → that becomes the main primary
+1. The service checks if the provided email or phone number already exists.
+2. If no match exists → a **new primary contact** is created.
+3. If matches exist:
 
-Convert later primaries → secondary
+   * Find the earliest primary → that becomes the **main primary**
+   * Convert later primaries → **secondary**
+   * If a new email/phone is submitted → create a **secondary** linked to the main primary
+4. Return a unified identity record.
 
-If a new email/phone is submitted → create a secondary linked to the main primary
+---
 
-Return a unified identity record.
+## 🗄 Database Schema
 
-🗄 Database Schema
-Field	Type	Description
-id	BIGINT	Primary key
-phoneNumber	VARCHAR	Optional
-email	VARCHAR	Optional
-linkedId	BIGINT	Points to primary contact if secondary
-linkPrecedence	primary or secondary	
-createdAt	TIMESTAMP	Auto-managed
-updatedAt	TIMESTAMP	Auto-managed
-deletedAt	TIMESTAMP	Nullable
-🐳 Deployment Instructions (Render + Docker)
-1. Create a PostgreSQL database on Render
+| Field            | Type                     | Description                            |
+| ---------------- | ------------------------ | -------------------------------------- |
+| `id`             | BIGINT                   | Primary key                            |
+| `phoneNumber`    | VARCHAR                  | Optional                               |
+| `email`          | VARCHAR                  | Optional                               |
+| `linkedId`       | BIGINT                   | Points to primary contact if secondary |
+| `linkPrecedence` | `primary` or `secondary` |                                        |
+| `createdAt`      | TIMESTAMP                | Auto-managed                           |
+| `updatedAt`      | TIMESTAMP                | Auto-managed                           |
+| `deletedAt`      | TIMESTAMP                | Nullable                               |
 
-Copy the Internal DB URL, which looks like:
+---
 
+## 🐳 Deployment (Render + Docker)
+
+This project is deployed on **Render** using Docker.
+
+### 1. Create a PostgreSQL database on Render
+
+Copy the **Internal DB URL** (Render dashboard) — it will look like:
+
+```
 postgresql://USER:PASSWORD@HOST:PORT/DBNAME
+```
 
-2. Add Environment Variables in Render
-Key	Value
-DATABASE_URL	<your full postgres internal URL>
-PORT	8080
-3. Your application.properties should contain:
+### 2. Add Environment Variables in Render
+
+| Key                 | Value                                    |
+| ------------------- | ---------------------------------------- |
+| `DATABASE_URL`      | `jdbc:postgresql://<HOST>:5432/<DBNAME>` |
+| `DATABASE_USERNAME` | `<user>`                                 |
+| `DATABASE_PASSWORD` | `<password>`                             |
+| `PORT`              | `8080`                                   |
+
+> Note: Render provides an internal URL; convert it to JDBC format (prefix with `jdbc:postgresql://` and include the host and port). Provide credentials separately.
+
+### 3. `application.properties` (production)
+
+```properties
 server.port=${PORT:8080}
-spring.application.name=bitespeed-identity
 
 spring.datasource.url=${DATABASE_URL}
+spring.datasource.username=${DATABASE_USERNAME}
+spring.datasource.password=${DATABASE_PASSWORD}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
 spring.jpa.hibernate.ddl-auto=update
@@ -121,23 +157,37 @@ spring.jpa.properties.hibernate.format_sql=true
 
 logging.level.org.hibernate.SQL=debug
 logging.level.org.hibernate.type.descriptor.sql.BasicBinder=trace
+```
 
-4. Deploy using Render’s Docker setup
+### 4. Deploy using Render’s Docker setup
 
-Render automatically builds the container and runs the service.
+Render will build your Dockerfile, run the container, and expose the public URL.
 
-🧪 Testing
-Example: Create a new customer
+---
+
+## 🧪 Testing
+
+### Create a new customer
+
+```bash
 curl -X POST "https://bitespeed-identity-mwhm.onrender.com/identify" \
 -H "Content-Type: application/json" \
 -d '{"email":"unique1@test.com", "phoneNumber":"9000012345"}'
+```
 
-Example: Merge with related contact
+### Merge with related contact
+
+```bash
 curl -X POST "https://bitespeed-identity-mwhm.onrender.com/identify" \
 -H "Content-Type: application/json" \
 -d '{"email":"alias@test.com", "phoneNumber":"9000012345"}'
+```
 
-📁 Project Structure
+---
+
+## 📁 Project Structure
+
+```
 src/
  ├── controller/
  │     └── ContactController.java
@@ -149,13 +199,20 @@ src/
  ├── repository/
  │     └── ContactRepository.java
  └── BitespeedIdentityApplication.java
+Dockerfile
+pom.xml
+README.md
+```
 
-⭐ Author
+---
 
-Built by Yashas
-Software Engineer | Java | Spring Boot | Distributed Systems | ML Enthusiast
+## ⭐ Author
 
-✔ Status: Fully Functional & Deployed
+Built by **Yashas**
 
-You can now directly test the live API:
-👉 https://bitespeed-identity-mwhm.onrender.com/identify
+---
+
+## ✔ Status: Fully Functional & Deployed
+
+You can test the live API at:
+**[https://bitespeed-identity-mwhm.onrender.com/identify](https://bitespeed-identity-mwhm.onrender.com/identify)**
